@@ -61,7 +61,7 @@ class Options
                 $isTranslatable = $option['translatable'];
                 // NOTE: because the first subpage starts with toplevel instead (there is no overview page).
                 $toplevelPageId = strtolower('toplevel_page_' . $optionType);
-                $menuTitle = static::$optionPages[$optionType]['menu_title'];
+                $menuTitle = static::$optionPages[$optionType]['menu_title'] ?? '';
                 // NOTE: all other subpages have the parent menu-title in front instead.
                 $subPageId = strtolower(
                     sanitize_title($menuTitle) . '_page_' . $optionType
@@ -99,13 +99,15 @@ class Options
             $title = _x($option['title'], 'title', 'flynt');
             $slug = ucfirst($optionType) . 'Options';
 
-            acf_add_options_page([
-                'page_title'  => $title,
-                'menu_title'  => $title,
-                'redirect'    => true,
-                'menu_slug'   => $slug,
-                'icon_url'    => $option['icon']
-            ]);
+            if (function_exists('acf_add_options_page')) {
+                acf_add_options_page([
+                    'page_title'  => $title,
+                    'menu_title'  => $title,
+                    'redirect'    => true,
+                    'menu_slug'   => $slug,
+                    'icon_url'    => $option['icon']
+                ]);
+            }
 
             static::$optionPages[$optionType] = [
                 'menu_slug' => $slug,
@@ -138,27 +140,34 @@ class Options
                 'menu_slug' => $categorySlug,
                 'parent_slug' => $optionPage['menu_slug']
             ];
-            acf_add_options_page($pageConfig);
+
+            if (function_exists('acf_add_options_page')) {
+                acf_add_options_page($pageConfig);
+            }
+
             static::$optionPages[$optionType]['sub_pages'][$optionCategory] = [
                 'menu_slug' => $categorySlug,
                 'menu_title' => $categoryTitle
             ];
-            $fieldGroup = ACFComposer\ResolveConfig::forFieldGroup([
-                'name' => $categorySlug,
-                'title' => $categoryTitle,
-                'style' => 'seamless',
-                'fields' => [],
-                'location' => [
-                    [
+
+            if (function_exists('acf_add_local_field_group')) {
+                $fieldGroup = ACFComposer\ResolveConfig::forFieldGroup([
+                    'name' => $categorySlug,
+                    'title' => $categoryTitle,
+                    'style' => 'seamless',
+                    'fields' => [],
+                    'location' => [
                         [
-                            'param' => 'options_page',
-                            'operator' => '==',
-                            'value' => $categorySlug
+                            [
+                                'param' => 'options_page',
+                                'operator' => '==',
+                                'value' => $categorySlug
+                            ]
                         ]
                     ]
-                ]
-            ]);
-            acf_add_local_field_group($fieldGroup);
+                ]);
+                acf_add_local_field_group($fieldGroup);
+            }
         }
     }
 
@@ -273,6 +282,11 @@ class Options
     public static function addOptions(string $scope, array $fields, string $type, string $category = 'Default'): void
     {
         static::createOptionSubPage($type, $category);
+
+        if (empty(static::$optionPages[$type]['sub_pages'][$category])) {
+            return;
+        }
+
         $fieldGroupTitle = StringHelpers::splitCamelCase($scope);
         $optionsPageSlug = self::$optionPages[$type]['sub_pages'][$category]['menu_slug'];
         $fieldGroupName = implode('_', [$type, $scope]);
@@ -313,6 +327,10 @@ class Options
      */
     protected static function addOptionsFieldGroup(string $name, string $title, string $optionsPageSlug, array $fields)
     {
+        if (!function_exists('acf_add_local_field')) {
+            return;
+        }
+
         $fieldGroup = ACFComposer\ResolveConfig::forFieldGroup(
             [
                 'name' => $name,
